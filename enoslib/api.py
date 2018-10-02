@@ -613,24 +613,14 @@ def expand_groups(grp):
         return [grp]
 
 
-def induce_faults(roles):
+def induce_faults():
     """Induce faults.
 
-    Args:
-        roles (dict): roles
-
-    Returns:
-        list of roles
-
-    Examples:
-
-        * roles lalala
     """
-    cloud_management = os_faults.connect(config='os-faults.yml')
+    cloud_management = os_faults.connect(config_filename='os-faults.yml')
     cloud_management.verify()
     keystone = cloud_management.get_service(name='keystone')
     keystone.terminate()
-    return roles
 
 
 # Private zone
