@@ -17,6 +17,7 @@ from enoslib.errors import (EnosFailedHostsError,
                     EnosUnreachableHostsError,
                     EnosSSHNotReady)
 from netaddr import IPAddress, IPSet
+import os_faults
 
 import copy
 import logging
@@ -610,6 +611,26 @@ def expand_groups(grp):
         return list(map(lambda x: n + str(x), range(s, e + 1)))
     else:
         return [grp]
+
+
+def induce_faults(roles):
+    """Induce faults.
+
+    Args:
+        roles (dict): roles
+
+    Returns:
+        list of roles
+
+    Examples:
+
+        * roles lalala
+    """
+    cloud_management = os_faults.connect(config='os-faults.yml')
+    cloud_management.verify()
+    keystone = cloud_management.get_service(name='keystone')
+    keystone.terminate()
+    return roles
 
 
 # Private zone
