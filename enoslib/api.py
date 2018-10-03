@@ -628,21 +628,28 @@ def induce_faults(config, roles, resultdir):
         typ = act['type']
         action = act['action']
         targets = act['target']
-        if typ == "service":
-            for target in targets:
-                constraint = target['when']
-                conf_cloud = _extract_cloud(constraint, resultdir, roles)
-                cloud_management = os_faults.connect(cloud_config=conf_cloud)
-                cloud_management.verify()
-                service = cloud_management.get_service(name=target['definition'])
-                if action in dir(service):
-                    logger.debug(act['name'])
-                    getattr(service, action)()
+        for target in targets:
+            constraint = target['when']
+            conf_cloud = _extract_cloud(constraint, resultdir, roles)
+            cloud_management = os_faults.connect(cloud_config=conf_cloud)
+            cloud_management.verify()
+            get_func = "get_" + typ
+            if get_func in dir(cloud_management):
+                type_object = getattr(cloud_management,
+                                      get_func)(name=target['definition'])
+            else:
+                raise Exception(
+                    'There is no {!r} in Cloud '\
+                    'Management.'.format(get_func))
 
-    # keystone = cloud_management.get_service(name='keystone')
-    # keystone.restart()
-    # cockroach_52 = cloud_management.get_container(name='cockroach')
-    # cockroach_52.terminate()
+            if action in dir(type_object):
+                logger.debug(act['name'])
+                getattr(type_object, action)()
+            else:
+                raise Exception(
+                    'There is no {!r} in '\
+                    '{!r}.'.format(get_func, type(type_object)))
+
 
 
 # Private zone
