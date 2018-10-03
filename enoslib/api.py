@@ -613,17 +613,60 @@ def expand_groups(grp):
         return [grp]
 
 
-def induce_faults():
+def induce_faults(config, roles, resultdir):
     """Induce faults.
 
+    Args:
+        config (dict): configuration to use
+        roles (dict): role->hosts mapping as returned by
+            :py:meth:`enoslib.infra.provider.Provider.init`
+        resultdir (str): path to the result directory
+
     """
-    cloud_management = os_faults.connect(config_filename='os-faults.yml')
-    cloud_management.verify()
-    keystone = cloud_management.get_service(name='keystone')
-    keystone.terminate()
+
+    for act in config:
+        typ = act['type']
+        action = act['action']
+        targets = act['target']
+        if typ == "service":
+            for target in targets:
+                constraint = target['when']
+                conf_cloud = _extract_cloud(constraint, resultdir, roles)
+                cloud_management = os_faults.connect(cloud_config=conf_cloud)
+                cloud_management.verify()
+                service = cloud_management.get_service(name=target['definition'])
+                if action in dir(service):
+                    logger.debug(act['name'])
+                    getattr(service, action)()
+
+    # keystone = cloud_management.get_service(name='keystone')
+    # keystone.restart()
+    # cockroach_52 = cloud_management.get_container(name='cockroach')
+    # cockroach_52.terminate()
 
 
 # Private zone
+def _extract_cloud(constraint, resultdir, roles):
+    facts_dir = os.path.join(resultdir, "facts")
+    nodes = roles[constraint['target']]
+    addresses = []
+    for node in nodes:
+        iface = node.extra[constraint['network']]
+        fact_file = os.path.join(facts_dir, node.address)
+        with open(fact_file) as f:
+            facts = json.load(f)
+            ip = facts['ansible_eno2']['ipv4']['address']
+            addresses.append(ip)
+    cloud = {'cloud_management':
+             {'driver': 'devstack_systemd',
+              'args':
+              {'private_key_file': '~/.ssh/id_rsa',
+               'iface': 'eno2', 'username': 'root',
+               'address': addresses.pop(0),
+               'slaves': addresses} } }
+    return cloud
+
+
 def _generate_inventory(roles):
     """Generates an inventory files from roles
 
