@@ -629,8 +629,8 @@ def induce_faults(config, roles, resultdir):
         action = act['action']
         targets = act['target']
         for target in targets:
-            constraint = target['when']
-            conf_cloud = _extract_cloud(constraint, resultdir, roles)
+            constraints = target['when']
+            conf_cloud = _extract_cloud(constraints, resultdir, roles)
             if typ == "system_service" or typ == "container":
                 conf_cloud = _add_drivers(typ, action, target, conf_cloud)
             cloud_management = os_faults.connect(cloud_config=conf_cloud)
@@ -656,22 +656,29 @@ def induce_faults(config, roles, resultdir):
 
 
 # Private zone
-def _extract_cloud(constraint, resultdir, roles):
-    facts_dir = os.path.join(resultdir, "facts")
-    nodes = roles[constraint['role']]
+def _extract_cloud(constraints, resultdir, roles):
     addresses = []
-    for node in nodes:
-        iface = node.extra[constraint['network']]
-        fact_file = os.path.join(facts_dir, node.address)
-        with open(fact_file) as f:
-            facts = json.load(f)
-            ip = facts['ansible_eno2']['ipv4']['address']
-            addresses.append(ip)
+    if 'ips' in constraints:
+        addresses = addresses + constraints['ips']
+        iface = 'eno1'
+    else:
+        facts_dir = os.path.join(resultdir, "facts")
+        nodes = roles[constraints['role']]
+        for node in nodes:
+            if 'network' not in constraints:
+                iface = 'eno1'
+            else:
+                iface = node.extra[constraints['network']]
+                fact_file = os.path.join(facts_dir, node.address)
+            with open(fact_file) as f:
+                facts = json.load(f)
+                ip = facts['ansible_{}'.format(iface)]['ipv4']['address']
+                addresses.append(ip)
     cloud = {'cloud_management':
              {'driver': 'devstack_systemd',
               'args':
               {'private_key_file': '~/.ssh/id_rsa',
-               'iface': 'eno2', 'username': 'root',
+               'iface': iface, 'username': 'root',
                'address': addresses.pop(0),
                'slaves': addresses} } }
     return cloud
