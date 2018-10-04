@@ -627,7 +627,7 @@ def induce_faults(config, roles, resultdir):
     for act in config:
         typ = act['type']
         action = act['action']
-        targets = act['target']
+        targets = act['targets']
         for target in targets:
             constraints = target['when']
             conf_cloud = _extract_cloud(constraints, resultdir, roles)
