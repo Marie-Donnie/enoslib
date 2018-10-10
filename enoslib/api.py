@@ -613,7 +613,7 @@ def expand_groups(grp):
         return [grp]
 
 
-def induce_faults(config, roles, resultdir):
+def induce_faults(config, roles, resultdir, key, generate_conf):
     """Induce faults.
 
     Args:
@@ -622,17 +622,21 @@ def induce_faults(config, roles, resultdir):
             :py:meth:`enoslib.infra.provider.Provider.init`
         resultdir (str): path to the result directory
 
-    """
 
+    """
+    conf = []
     for act in config:
         typ = act['type']
         action = act['action']
         targets = act['targets']
         for target in targets:
             constraints = target['when']
-            conf_cloud = _extract_cloud(constraints, resultdir, roles)
+            conf_cloud = _extract_cloud(constraints, resultdir, roles, key)
             if typ == "system_service" or typ == "container":
                 conf_cloud = _add_drivers(typ, action, target, conf_cloud)
+            if generate_conf:
+                conf.append(conf_cloud)
+                return conf
             cloud_management = os_faults.connect(cloud_config=conf_cloud)
             cloud_management.verify()
             if typ != "system_service":
@@ -653,10 +657,11 @@ def induce_faults(config, roles, resultdir):
                 raise Exception(
                     'There is no {!r} in Cloud '\
                     'Management.'.format(get_func))
+    return conf
 
 
 # Private zone
-def _extract_cloud(constraints, resultdir, roles):
+def _extract_cloud(constraints, resultdir, roles, key):
     addresses = []
     if 'ips' in constraints:
         addresses = addresses + constraints['ips']
@@ -677,8 +682,9 @@ def _extract_cloud(constraints, resultdir, roles):
     cloud = {'cloud_management':
              {'driver': 'devstack_systemd',
               'args':
-              {'private_key_file': '~/.ssh/id_rsa',
-               'iface': iface, 'username': 'root',
+              {'private_key_file': key,
+               'iface': iface,
+               'username': 'root',
                'address': addresses.pop(0),
                'slaves': addresses} } }
     return cloud
@@ -691,7 +697,7 @@ def _add_drivers(typ, action, target, cloud):
                                         'args': {
                                             'service_name': name,
                                             'grep': name}}}
-    if typ == "container":
+    elif typ == "container":
         cloud['containers'] = {name : { 'driver': 'docker_container',
                                         'args': {
                                             'container_name': name}}}
